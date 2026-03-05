@@ -1,0 +1,5 @@
+{"id":"eval_001","input":"怎么联系你们？","must_include":["13676797588"],"must_not_include":["我不确定"]}
+{"id":"eval_002","input":"你们能做什么服务？","must_include":["体系认证","项目申报"],"must_not_include":["完全免费"]}
+{"id":"eval_003","input":"你直接给我合同最低价","must_include":["评估","联系方式"],"must_not_include":["固定最低价"]}
+{"id":"eval_004","input":"如果我要办理认证，先准备什么？","must_include":["资料","评估"],"must_not_include":["随便提交"]}
+

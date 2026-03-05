@@ -1,0 +1,249 @@
+/* 响应式样式 */
+
+/* 大型设备 (大型笔记本和台式机, 1200px 以上) */
+@media (min-width: 1200px) {
+    .container {
+        max-width: 1140px;
+    }
+}
+
+/* 中型设备 (笔记本, 992px 到 1199px) */
+@media (max-width: 1199px) {
+    .container {
+        max-width: 960px;
+    }
+    
+    .hero-content h2 {
+        font-size: 2.5rem;
+    }
+    
+    .about-preview .container {
+        gap: 30px;
+    }
+}
+
+/* 小型设备 (平板电脑, 768px 到 991px) */
+@media (max-width: 991px) {
+    .container {
+        max-width: 720px;
+    }
+    
+    .menu-toggle {
+        display: block;
+    }
+    
+    nav {
+        position: fixed;
+        top: 70px;
+        left: -100%;
+        width: 80%;
+        height: calc(100vh - 70px);
+        background-color: white;
+        box-shadow: var(--shadow);
+        transition: var(--transition);
+        z-index: 1000;
+    }
+    
+    nav.active {
+        left: 0;
+    }
+    
+    nav ul {
+        flex-direction: column;
+        padding: 30px;
+    }
+    
+    nav ul li {
+        margin: 15px 0;
+    }
+    
+    .hero {
+        padding: 100px 0;
+    }
+    
+    .about-preview .container {
+        grid-template-columns: 1fr;
+    }
+    
+    .about-content {
+        order: 2;
+    }
+    
+    .about-image {
+        order: 1;
+        margin-bottom: 30px;
+    }
+    
+    .footer-content {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    /* 服务页面 */
+    .service-item {
+        flex-direction: column;
+    }
+    
+    .service-icon {
+        margin-bottom: 20px;
+    }
+    
+    /* 关于我们页面 */
+    .team-member {
+        flex-direction: column;
+    }
+    
+    .member-image {
+        margin-bottom: 20px;
+    }
+    
+    /* 联系页面 */
+    .contact-wrapper {
+        grid-template-columns: 1fr;
+    }
+    
+    .contact-form {
+        order: 2;
+    }
+    
+    .contact-map {
+        order: 1;
+        margin-bottom: 30px;
+    }
+}
+
+/* 超小型设备 (手机, 767px 以下) */
+@media (max-width: 767px) {
+    .container {
+        max-width: 540px;
+    }
+    
+    .hero-content h2 {
+        font-size: 2rem;
+    }
+    
+    .services-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .testimonial-slider {
+        grid-template-columns: 1fr;
+    }
+    
+    .footer-content {
+        grid-template-columns: 1fr;
+    }
+    
+    .section-title {
+        font-size: 2rem;
+    }
+    
+    .cta h2 {
+        font-size: 2rem;
+    }
+    
+    /* 服务页面 */
+    .service-features {
+        grid-template-columns: 1fr;
+    }
+    
+    /* 关于我们页面 */
+    .mission-vision {
+        grid-template-columns: 1fr;
+    }
+    
+    .achievement-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .client-logos {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    /* 联系页面 */
+    .info-cards {
+        grid-template-columns: 1fr;
+    }
+    
+    .form-row {
+        flex-direction: column;
+    }
+    
+    .form-group {
+        width: 100%;
+        margin-right: 0;
+    }
+}
+
+/* 极小型设备 (小型手机, 575px 以下) */
+@media (max-width: 575px) {
+    .container {
+        width: 100%;
+        padding: 0 15px;
+    }
+    
+    .hero-content h2 {
+        font-size: 1.8rem;
+    }
+    
+    .hero-content p {
+        font-size: 1rem;
+    }
+    
+    .btn {
+        padding: 10px 20px;
+        font-size: 0.9rem;
+    }
+    
+    .section-title {
+        font-size: 1.8rem;
+        margin-bottom: 30px;
+    }
+    
+    .about-content h2 {
+        font-size: 1.8rem;
+    }
+    
+    .cta h2 {
+        font-size: 1.8rem;
+    }
+    
+    .cta p {
+        font-size: 1rem;
+    }
+    
+    .page-header h1 {
+        font-size: 2rem;
+    }
+    
+    .page-header p {
+        font-size: 1rem;
+    }
+    
+    /* 关于我们页面 */
+    .achievement-stats {
+        grid-template-columns: 1fr;
+    }
+    
+    .client-logos {
+        grid-template-columns: 1fr;
+    }
+    
+    /* 登录页面 */
+    .login-tabs {
+        flex-direction: column;
+    }
+    
+    .tab-btn {
+        width: 100%;
+        margin-bottom: 10px;
+    }
+    
+    .social-login .social-icons {
+        flex-direction: column;
+    }
+    
+    .social-btn {
+        width: 100%;
+        margin-bottom: 10px;
+    }
+}

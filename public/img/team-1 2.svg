@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+  <!-- 背景 -->
+  <rect width="400" height="400" fill="#f0f0f0"/>
+  
+  <!-- 照片框 -->
+  <rect x="10" y="10" width="380" height="380" fill="#ffffff" stroke="#333333" stroke-width="2"/>
+  
+  <!-- 照片内容 -->
+  <g transform="translate(50, 50)">
+    <!-- 头部 -->
+    <circle cx="150" cy="100" r="80" fill="#f5d0a9"/>
+    
+    <!-- 西装 -->
+    <path d="M70,180 L230,180 L250,380 L50,380 Z" fill="#1a3c6e"/>
+    
+    <!-- 衬衫 -->
+    <path d="M120,180 L180,180 L180,380 L120,380 Z" fill="#ffffff"/>
+    
+    <!-- 领带 -->
+    <path d="M140,180 L160,180 L165,230 L150,240 L135,230 L140,180 Z" fill="#2c4c7c" stroke="#1a3c6e" stroke-width="1"/>
+    <path d="M145,230 L155,230 L158,260 L150,270 L142,260 L145,230 Z" fill="#2c4c7c" stroke="#1a3c6e" stroke-width="1"/>
+    
+    <!-- 眼镜 -->
+    <rect x="110" y="90" width="30" height="20" rx="5" ry="5" fill="none" stroke="#333333" stroke-width="3"/>
+    <rect x="160" y="90" width="30" height="20" rx="5" ry="5" fill="none" stroke="#333333" stroke-width="3"/>
+    <line x1="140" y1="100" x2="160" y2="100" stroke="#333333" stroke-width="3"/>
+    
+    <!-- 嘴巴 -->
+    <path d="M130,130 Q150,145 170,130" fill="none" stroke="#333333" stroke-width="2"/>
+    
+    <!-- 头发 -->
+    <path d="M70,70 Q150,20 230,70 L230,100 Q150,80 70,100 Z" fill="#000000"/>
+  </g>
+  
+  <!-- 文字说明 -->
+  <text x="200" y="20" font-family="Arial" font-size="16" text-anchor="middle" fill="#cc0000" font-weight="bold">曾云俊总经理照片</text>
+</svg>

@@ -1,0 +1,33 @@
+{
+  "tools": [
+    {
+      "name": "create_lead",
+      "description": "创建客户线索记录",
+      "input_schema": {
+        "type": "object",
+        "required": ["company_name", "contact_name", "phone", "service_intent"],
+        "properties": {
+          "company_name": { "type": "string" },
+          "contact_name": { "type": "string" },
+          "phone": { "type": "string" },
+          "email": { "type": "string" },
+          "service_intent": { "type": "string" },
+          "urgency": { "type": "string", "enum": ["low", "medium", "high"] },
+          "notes": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "query_service_catalog",
+      "description": "查询公司服务目录与适用条件",
+      "input_schema": {
+        "type": "object",
+        "required": ["keyword"],
+        "properties": {
+          "keyword": { "type": "string" }
+        }
+      }
+    }
+  ]
+}
+

@@ -1,0 +1,19 @@
+{
+  "type": "object",
+  "required": [
+    "company_name",
+    "contact_name",
+    "phone",
+    "service_intent"
+  ],
+  "properties": {
+    "company_name": { "type": "string", "minLength": 1 },
+    "contact_name": { "type": "string", "minLength": 1 },
+    "phone": { "type": "string", "minLength": 6 },
+    "email": { "type": "string" },
+    "service_intent": { "type": "string", "minLength": 1 },
+    "urgency": { "type": "string", "enum": ["low", "medium", "high"] },
+    "notes": { "type": "string" }
+  }
+}
+

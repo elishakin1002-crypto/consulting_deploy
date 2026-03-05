@@ -1,0 +1,20 @@
+# Ignore system files
+.DS_Store
+Thumbs.db
+
+# Ignore Python cache
+__pycache__/
+*.py[cod]
+
+# Ignore virtual environments
+venv/
+env/
+.env
+
+# Ignore IDE files
+.vscode/
+.idea/
+.trae/
+
+# Ignore sensitive files
+# (Add any sensitive files like API keys here if they are not in environment variables)

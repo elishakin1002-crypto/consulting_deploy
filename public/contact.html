@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>联系我们 - 浙江信义企业管理有限公司</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/responsive.css">
+    <link rel="stylesheet" href="css/contact.css">
+    <link rel="stylesheet" href="https://cdn.staticfile.org/font-awesome/5.15.3/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="logo">
+                <h1>浙江信义企业管理有限公司</h1>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="index.html">首页</a></li>
+                    <li><a href="services.html">服务</a></li>
+                    <li><a href="about.html">关于我们</a></li>
+                    <li><a href="contact.html" class="active">联系我们</a></li>
+                    <li><a href="login.html" class="btn-login">登录</a></li>
+                </ul>
+            </nav>
+            <div class="menu-toggle">
+                <i class="fas fa-bars"></i>
+            </div>
+        </div>
+    </header>
+
+    <section class="page-header">
+        <div class="container">
+            <h1>联系我们</h1>
+            <p>随时为您提供专业咨询服务</p>
+        </div>
+    </section>
+
+    <section class="contact-info">
+        <div class="container">
+            <div class="info-cards">
+                <div class="info-card">
+                    <div class="icon">
+                        <i class="fas fa-map-marker-alt"></i>
+                    </div>
+                    <h3>公司地址</h3>
+                    <p>浙江省温州经济技术开发区机场大道4079号701室</p>
+                </div>
+                <div class="info-card">
+                    <div class="icon">
+                        <i class="fas fa-phone"></i>
+                    </div>
+                    <h3>联系电话</h3>
+                    <p>13676797588</p>
+                </div>
+                <div class="info-card">
+                    <div class="icon">
+                        <i class="fas fa-envelope"></i>
+                    </div>
+                    <h3>电子邮箱</h3>
+                    <p>87333310@qq.com</p>
+                </div>
+                <div class="info-card">
+                    <div class="icon">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <h3>工作时间</h3>
+                    <p>周一至周五: 8:30 - 17:30<br>周六: 9:00 - 12:00</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="contact-form-section">
+        <div class="container">
+            <div class="contact-wrapper">
+                <div class="contact-form">
+                    <h2>发送消息</h2>
+                    <p>如果您有任何关于体系认证、产品认证、政府项目申报或其他服务的咨询，请填写下面的表单，我们会尽快回复您。</p>
+                    <form id="contactForm">
+                        <div class="form-group">
+                            <label for="name">姓名</label>
+                            <input type="text" id="name" name="name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="email">电子邮箱</label>
+                            <input type="email" id="email" name="email" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="phone">电话</label>
+                            <input type="tel" id="phone" name="phone" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="company">公司</label>
+                            <input type="text" id="company" name="company" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="service">咨询服务</label>
+                            <select id="service" name="service" required>
+                                <option value="">请选择服务类型</option>
+                                <option value="体系认证">体系认证</option>
+                                <option value="产品认证">产品认证</option>
+                                <option value="政府项目申报">政府项目申报</option>
+                                <option value="管理顾问服务">管理顾问服务</option>
+                                <option value="生产许可证">生产许可证</option>
+                                <option value="其他服务">其他服务</option>
+                            </select>
+                        </div>
+                        <div class="form-group full-width">
+                            <label for="message">需求描述</label>
+                            <textarea id="message" name="message" rows="5" required></textarea>
+                        </div>
+                        <div class="form-group full-width">
+                            <button type="submit" class="btn">发送消息</button>
+                        </div>
+                        <div id="form-message" class="form-message"></div>
+                    </form>
+                </div>
+                <div class="contact-map">
+                    <h2>我们的位置</h2>
+                    <div class="map-container">
+                        <!-- 这里放置地图，实际项目中可以使用百度地图或高德地图API -->
+                        <img src="img/map.jpg" alt="浙江信义企业管理有限公司地图位置">
+                    </div>
+                    <div class="social-connect">
+                        <h3>关注我们</h3>
+                        <div class="social-icons">
+                            <a href="#" class="social-icon"><i class="fab fa-weixin"></i></a>
+                            <a href="#" class="social-icon"><i class="fab fa-weibo"></i></a>
+                            <a href="#" class="social-icon"><i class="fab fa-linkedin"></i></a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="faq">
+        <div class="container">
+            <h2 class="section-title">常见问题</h2>
+            <div class="faq-container">
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <h3>贵公司提供哪些体系认证服务？</h3>
+                        <span class="toggle-icon"><i class="fas fa-plus"></i></span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>我们提供全面的管理体系认证服务，包括ISO9001质量管理体系、ISO14001环境管理体系、ISO45001职业健康安全管理体系、ISO22000食品安全管理体系等多种国际标准认证服务。</p>
+                        <div class="faq-actions">
+                            <button type="button" class="faq-ask-ai" data-ask="贵公司提供哪些体系认证服务？">继续问智能助手</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <h3>申请体系认证需要准备哪些材料？</h3>
+                        <span class="toggle-icon"><i class="fas fa-plus"></i></span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>申请体系认证通常需要准备公司基本信息、组织架构、管理手册、程序文件、作业指导书等材料。具体材料清单会根据认证类型有所不同，我们的顾问会提供详细的指导。</p>
+                        <div class="faq-actions">
+                            <button type="button" class="faq-ask-ai" data-ask="申请体系认证需要准备哪些材料？">继续问智能助手</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <h3>政府项目申报的成功率如何？</h3>
+                        <span class="toggle-icon"><i class="fas fa-plus"></i></span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>我们的政府项目申报成功率在行业内处于领先水平。我们拥有专业的申报团队和丰富的申报经验，能够为客户提供精准的政策解读和专业的申报服务，大大提高申报成功率。</p>
+                        <div class="faq-actions">
+                            <button type="button" class="faq-ask-ai" data-ask="政府项目申报的成功率如何？">继续问智能助手</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <h3>如何开始与贵公司合作？</h3>
+                        <span class="toggle-icon"><i class="fas fa-plus"></i></span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>您可以通过网站联系表单、电话或电子邮件与我们联系。我们的客户经理会尽快回复，安排初步沟通，了解您的需求并提供相应的解决方案。之后我们会安排专业顾问进行现场诊断，制定详细的服务方案。</p>
+                        <div class="faq-actions">
+                            <button type="button" class="faq-ask-ai" data-ask="如何开始与贵公司合作？">继续问智能助手</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="cta">
+        <div class="container">
+            <h2>准备好开始您的咨询项目了吗？</h2>
+            <p>联系我们，获取专业解决方案</p>
+            <a href="#contactForm" class="btn">立即联系</a>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>咨询专家</h3>
+                    <p>提供专业的商业咨询服务，助力企业成长</p>
+                </div>
+                <div class="footer-section">
+                    <h3>快速链接</h3>
+                    <ul>
+                        <li><a href="index.html">首页</a></li>
+                        <li><a href="services.html">服务</a></li>
+                        <li><a href="about.html">关于我们</a></li>
+                        <li><a href="contact.html">联系我们</a></li>
+                        <li><a href="login.html">登录</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h3>联系我们</h3>
+                    <p><i class="fas fa-map-marker-alt"></i> 浙江省温州经济技术开发区机场大道4079号701室</p>
+                    <p><i class="fas fa-phone"></i> 13676797588</p>
+                    <p><i class="fas fa-envelope"></i> 87333310@qq.com</p>
+                </div>
+                <div class="footer-section">
+                    <h3>关注我们</h3>
+                    <div class="social-icons">
+                        <a href="#"><i class="fab fa-weixin"></i></a>
+                        <a href="#"><i class="fab fa-weibo"></i></a>
+                        <a href="#"><i class="fab fa-linkedin"></i></a>
+                    </div>
+                </div>
+            </div>
+            <div class="copyright">
+                <p>&copy; 2023 咨询专家. 保留所有权利</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/script.js?v=20260305c"></script>
+    <script src="js/contact.js"></script>
+</body>
+</html>
