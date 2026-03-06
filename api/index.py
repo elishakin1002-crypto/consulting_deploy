@@ -7,27 +7,51 @@ import certifi
 import requests
 from flask import Flask, jsonify, request
 
-try:
-    from api.response_policy import build_policy_prompt, enforce_policy_reply
-except Exception:
-    from response_policy import build_policy_prompt, enforce_policy_reply  # type: ignore
+_CACHED_MODULES: Dict[str, Any] | None = None
+_MODULE_LOAD_ERROR = ""
 
-try:
-    from api.sales_brain import (
-        append_turn_log,
-        analyze_turn,
-        build_sales_guidance,
-        ensure_session_id,
-        merge_lead_profile,
-    )
-except Exception:
-    from sales_brain import (  # type: ignore
-        append_turn_log,
-        analyze_turn,
-        build_sales_guidance,
-        ensure_session_id,
-        merge_lead_profile,
-    )
+
+def _load_business_modules() -> Dict[str, Any]:
+    global _CACHED_MODULES, _MODULE_LOAD_ERROR
+    if _CACHED_MODULES is not None:
+        return _CACHED_MODULES
+
+    try:
+        try:
+            from api.response_policy import build_policy_prompt, enforce_policy_reply  # type: ignore
+        except Exception:
+            from response_policy import build_policy_prompt, enforce_policy_reply  # type: ignore
+
+        try:
+            from api.sales_brain import (  # type: ignore
+                append_turn_log,
+                analyze_turn,
+                build_sales_guidance,
+                ensure_session_id,
+                merge_lead_profile,
+            )
+        except Exception:
+            from sales_brain import (  # type: ignore
+                append_turn_log,
+                analyze_turn,
+                build_sales_guidance,
+                ensure_session_id,
+                merge_lead_profile,
+            )
+
+        _CACHED_MODULES = {
+            "build_policy_prompt": build_policy_prompt,
+            "enforce_policy_reply": enforce_policy_reply,
+            "append_turn_log": append_turn_log,
+            "analyze_turn": analyze_turn,
+            "build_sales_guidance": build_sales_guidance,
+            "ensure_session_id": ensure_session_id,
+            "merge_lead_profile": merge_lead_profile,
+        }
+        return _CACHED_MODULES
+    except Exception as e:
+        _MODULE_LOAD_ERROR = f"{type(e).__name__}: {str(e)[:180]}"
+        return {}
 
 
 def _normalize_api_key(raw_value: str) -> str:
@@ -62,10 +86,22 @@ CUSTOM_CA_FILE = (
     or os.environ.get("REQUESTS_CA_BUNDLE")
     or ""
 ).strip()
-REQUEST_TIMEOUT_SECONDS = float(os.environ.get("UPSTREAM_TIMEOUT_SECONDS", "15"))
+def _safe_timeout_seconds() -> float:
+    raw = os.environ.get("UPSTREAM_TIMEOUT_SECONDS", "15")
+    try:
+        return max(3.0, float(raw))
+    except Exception:
+        return 15.0
+
+
+REQUEST_TIMEOUT_SECONDS = _safe_timeout_seconds()
 
 
 def _safe_append_turn_log(**kwargs: Any) -> None:
+    mods = _load_business_modules()
+    append_turn_log = mods.get("append_turn_log")
+    if append_turn_log is None:
+        return
     try:
         append_turn_log(**kwargs)
     except Exception:
@@ -74,6 +110,10 @@ def _safe_append_turn_log(**kwargs: Any) -> None:
 
 
 def _safe_merge_lead_profile(session_id: str, extracted: Dict[str, Any]) -> Dict[str, Any]:
+    mods = _load_business_modules()
+    merge_lead_profile = mods.get("merge_lead_profile")
+    if merge_lead_profile is None:
+        return extracted if isinstance(extracted, dict) else {}
     try:
         return merge_lead_profile(session_id, extracted)
     except Exception:
@@ -153,6 +193,22 @@ def chat():
     pre_analysis: Dict[str, Any] = {}
 
     try:
+        modules = _load_business_modules()
+        if not modules:
+            return _json_response(
+                {
+                    "error": "服务端模块加载失败",
+                    "detail": _MODULE_LOAD_ERROR or "unknown import error",
+                },
+                500,
+            )
+
+        build_policy_prompt = modules["build_policy_prompt"]
+        enforce_policy_reply = modules["enforce_policy_reply"]
+        analyze_turn = modules["analyze_turn"]
+        build_sales_guidance = modules["build_sales_guidance"]
+        ensure_session_id = modules["ensure_session_id"]
+
         data = request.get_json(silent=True)
         if data is None:
             return _json_response({"error": "JSON 格式错误"}, 400)
