@@ -268,19 +268,28 @@ document.addEventListener('DOMContentLoaded', function() {
         openChatWindow(persist = true) {
             this.window.classList.add('active');
             if (persist) localStorage.setItem(this.windowStateStorageKey, '1');
-            this.touchActive();
-            // 在移动端隐藏悬浮球
-            if (window.innerWidth <= 480) {
+            
+            // 关键：在移动端，打开窗口时强制隐藏悬浮球
+            if (window.innerWidth <= 480 && this.toggle) {
                 this.toggle.classList.add('hidden');
+                this.toggle.style.display = 'none'; // 强制内联样式隐藏
             }
+
+            this.touchActive();
             this.input.focus();
             this.scrollToBottom();
+            this.promptApiKeyIfNeeded();
         },
 
         closeChatWindow(persist = true) {
             this.window.classList.remove('active');
-            // 恢复显示悬浮球
-            this.toggle.classList.remove('hidden');
+            
+            // 恢复悬浮球显示
+            if (this.toggle) {
+                this.toggle.classList.remove('hidden');
+                this.toggle.style.display = ''; // 清除内联样式
+            }
+
             if (persist) localStorage.setItem(this.windowStateStorageKey, '0');
             this.touchActive();
             if (this.isListening) this.stopVoiceInput();
@@ -289,13 +298,8 @@ document.addEventListener('DOMContentLoaded', function() {
         toggleChatWindow() {
             if (this.window.classList.contains('active')) {
                 this.closeChatWindow();
-                this.toggle.classList.remove('hidden'); // 显示悬浮球
             } else {
                 this.openChatWindow();
-                // 在移动端隐藏悬浮球，防止遮挡
-                if (window.innerWidth <= 480) {
-                    this.toggle.classList.add('hidden');
-                }
             }
         },
 
