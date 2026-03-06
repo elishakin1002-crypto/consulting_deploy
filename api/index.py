@@ -1,57 +1,22 @@
+import importlib.util
 import json
 import os
+import ssl
 import time
+import urllib.error
+import urllib.request
+from http.server import BaseHTTPRequestHandler
 from typing import Any, Dict, List
 
-import certifi
-import requests
-from flask import Flask, jsonify, request
 
-_CACHED_MODULES: Dict[str, Any] | None = None
-_MODULE_LOAD_ERROR = ""
-
-
-def _load_business_modules() -> Dict[str, Any]:
-    global _CACHED_MODULES, _MODULE_LOAD_ERROR
-    if _CACHED_MODULES is not None:
-        return _CACHED_MODULES
-
-    try:
-        try:
-            from api.response_policy import build_policy_prompt, enforce_policy_reply  # type: ignore
-        except Exception:
-            from response_policy import build_policy_prompt, enforce_policy_reply  # type: ignore
-
-        try:
-            from api.sales_brain import (  # type: ignore
-                append_turn_log,
-                analyze_turn,
-                build_sales_guidance,
-                ensure_session_id,
-                merge_lead_profile,
-            )
-        except Exception:
-            from sales_brain import (  # type: ignore
-                append_turn_log,
-                analyze_turn,
-                build_sales_guidance,
-                ensure_session_id,
-                merge_lead_profile,
-            )
-
-        _CACHED_MODULES = {
-            "build_policy_prompt": build_policy_prompt,
-            "enforce_policy_reply": enforce_policy_reply,
-            "append_turn_log": append_turn_log,
-            "analyze_turn": analyze_turn,
-            "build_sales_guidance": build_sales_guidance,
-            "ensure_session_id": ensure_session_id,
-            "merge_lead_profile": merge_lead_profile,
-        }
-        return _CACHED_MODULES
-    except Exception as e:
-        _MODULE_LOAD_ERROR = f"{type(e).__name__}: {str(e)[:180]}"
-        return {}
+MODULE_LOAD_ERROR = ""
+BUILD_POLICY_PROMPT = None
+ENFORCE_POLICY_REPLY = None
+APPEND_TURN_LOG = None
+ANALYZE_TURN = None
+BUILD_SALES_GUIDANCE = None
+ENSURE_SESSION_ID = None
+MERGE_LEAD_PROFILE = None
 
 
 def _normalize_api_key(raw_value: str) -> str:
@@ -59,17 +24,54 @@ def _normalize_api_key(raw_value: str) -> str:
     if not key:
         return ""
     lowered = key.lower()
-    placeholder_values = {
-        "<set>",
-        "your_api_key_here",
-        "replace_me",
-        "changeme",
-    }
+    placeholder_values = {"<set>", "your_api_key_here", "replace_me", "changeme"}
     if lowered in placeholder_values:
         return ""
     if key.startswith("sk-xxxxxxxx") or key.startswith("sk-XXXX"):
         return ""
     return key
+
+
+def _safe_timeout_seconds() -> float:
+    raw = os.environ.get("UPSTREAM_TIMEOUT_SECONDS", "15")
+    try:
+        return max(3.0, float(raw))
+    except Exception:
+        return 15.0
+
+
+def _load_module_from_file(module_name: str):
+    current_dir = os.path.dirname(__file__)
+    file_path = os.path.join(current_dir, f"{module_name}.py")
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(file_path)
+    spec = importlib.util.spec_from_file_location(module_name, file_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load spec for {module_name}")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _boot_modules() -> None:
+    global MODULE_LOAD_ERROR
+    global BUILD_POLICY_PROMPT, ENFORCE_POLICY_REPLY
+    global APPEND_TURN_LOG, ANALYZE_TURN, BUILD_SALES_GUIDANCE, ENSURE_SESSION_ID, MERGE_LEAD_PROFILE
+
+    try:
+        policy_mod = _load_module_from_file("response_policy")
+        sales_mod = _load_module_from_file("sales_brain")
+
+        BUILD_POLICY_PROMPT = getattr(policy_mod, "build_policy_prompt")
+        ENFORCE_POLICY_REPLY = getattr(policy_mod, "enforce_policy_reply")
+
+        APPEND_TURN_LOG = getattr(sales_mod, "append_turn_log")
+        ANALYZE_TURN = getattr(sales_mod, "analyze_turn")
+        BUILD_SALES_GUIDANCE = getattr(sales_mod, "build_sales_guidance")
+        ENSURE_SESSION_ID = getattr(sales_mod, "ensure_session_id")
+        MERGE_LEAD_PROFILE = getattr(sales_mod, "merge_lead_profile")
+    except Exception as e:
+        MODULE_LOAD_ERROR = f"{type(e).__name__}: {str(e)[:240]}"
 
 
 API_KEY = _normalize_api_key(
@@ -86,47 +88,10 @@ CUSTOM_CA_FILE = (
     or os.environ.get("REQUESTS_CA_BUNDLE")
     or ""
 ).strip()
-def _safe_timeout_seconds() -> float:
-    raw = os.environ.get("UPSTREAM_TIMEOUT_SECONDS", "15")
-    try:
-        return max(3.0, float(raw))
-    except Exception:
-        return 15.0
-
-
 REQUEST_TIMEOUT_SECONDS = _safe_timeout_seconds()
 
 
-def _safe_append_turn_log(**kwargs: Any) -> None:
-    mods = _load_business_modules()
-    append_turn_log = mods.get("append_turn_log")
-    if append_turn_log is None:
-        return
-    try:
-        append_turn_log(**kwargs)
-    except Exception:
-        # Vercel serverless file system is read-only in most paths.
-        pass
-
-
-def _safe_merge_lead_profile(session_id: str, extracted: Dict[str, Any]) -> Dict[str, Any]:
-    mods = _load_business_modules()
-    merge_lead_profile = mods.get("merge_lead_profile")
-    if merge_lead_profile is None:
-        return extracted if isinstance(extracted, dict) else {}
-    try:
-        return merge_lead_profile(session_id, extracted)
-    except Exception:
-        # Keep chat available even if profile persistence fails.
-        return extracted if isinstance(extracted, dict) else {}
-
-
-def _resolve_verify_setting() -> Any:
-    if ALLOW_INSECURE_SSL:
-        return False
-    if CUSTOM_CA_FILE:
-        return CUSTOM_CA_FILE
-    return certifi.where()
+_boot_modules()
 
 
 def _load_knowledge_base() -> str:
@@ -139,29 +104,32 @@ def _load_knowledge_base() -> str:
 
 
 KNOWLEDGE_BASE = _load_knowledge_base()
-app = Flask(__name__)
 
 
-def _json_response(payload: Dict[str, Any], status_code: int):
-    resp = jsonify(payload)
-    resp.status_code = status_code
-    resp.headers["Access-Control-Allow-Origin"] = "*"
-    resp.headers["Access-Control-Allow-Headers"] = "Content-Type, X-API-Key, Authorization"
-    resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-    return resp
+def _resolve_ssl_context() -> ssl.SSLContext:
+    if ALLOW_INSECURE_SSL:
+        return ssl._create_unverified_context()
+    if CUSTOM_CA_FILE:
+        return ssl.create_default_context(cafile=CUSTOM_CA_FILE)
+    return ssl.create_default_context()
 
 
-def _extract_api_key(payload: Dict[str, Any]) -> str:
-    client_api_key = _normalize_api_key(request.headers.get("X-API-Key", ""))
-    auth_header = request.headers.get("Authorization", "").strip()
-    if auth_header.lower().startswith("bearer "):
-        bearer_key = _normalize_api_key(auth_header.split(" ", 1)[1].strip())
-        if bearer_key:
-            client_api_key = bearer_key
-    body_key = _normalize_api_key(
-        str(payload.get("api_key") or payload.get("apiKey") or payload.get("key") or "")
-    )
-    return API_KEY or client_api_key or body_key
+def _safe_append_turn_log(**kwargs: Any) -> None:
+    if APPEND_TURN_LOG is None:
+        return
+    try:
+        APPEND_TURN_LOG(**kwargs)
+    except Exception:
+        pass
+
+
+def _safe_merge_lead_profile(session_id: str, extracted: Dict[str, Any]) -> Dict[str, Any]:
+    if MERGE_LEAD_PROFILE is None:
+        return extracted if isinstance(extracted, dict) else {}
+    try:
+        return MERGE_LEAD_PROFILE(session_id, extracted)
+    except Exception:
+        return extracted if isinstance(extracted, dict) else {}
 
 
 def _normalize_history(raw_history: Any) -> List[Dict[str, str]]:
@@ -178,58 +146,75 @@ def _normalize_history(raw_history: Any) -> List[Dict[str, str]]:
     return safe_history
 
 
-@app.route("/", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api/chat", methods=["GET", "POST", "OPTIONS"])
-def chat():
-    if request.method == "OPTIONS":
-        return _json_response({"ok": True}, 204)
+class handler(BaseHTTPRequestHandler):
+    def _send_json(self, status_code: int, payload: Dict[str, Any]) -> None:
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        self.send_response(status_code)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-API-Key, Authorization")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
-    if request.method == "GET":
-        return _json_response({"ok": True, "service": "xinyi-chat-api", "model": MOONSHOT_MODEL}, 200)
+    def do_OPTIONS(self):
+        self._send_json(204, {"ok": True})
 
-    session_id = ""
-    user_message = ""
-    safe_history: List[Dict[str, str]] = []
-    pre_analysis: Dict[str, Any] = {}
+    def do_GET(self):
+        self._send_json(200, {"ok": True, "service": "xinyi-chat-api", "model": MOONSHOT_MODEL})
 
-    try:
-        modules = _load_business_modules()
-        if not modules:
-            return _json_response(
-                {
-                    "error": "服务端模块加载失败",
-                    "detail": _MODULE_LOAD_ERROR or "unknown import error",
-                },
-                500,
-            )
+    def do_POST(self):
+        if MODULE_LOAD_ERROR:
+            self._send_json(500, {"error": "服务端模块加载失败", "detail": MODULE_LOAD_ERROR})
+            return
 
-        build_policy_prompt = modules["build_policy_prompt"]
-        enforce_policy_reply = modules["enforce_policy_reply"]
-        analyze_turn = modules["analyze_turn"]
-        build_sales_guidance = modules["build_sales_guidance"]
-        ensure_session_id = modules["ensure_session_id"]
+        if not all([
+            BUILD_POLICY_PROMPT,
+            ENFORCE_POLICY_REPLY,
+            ANALYZE_TURN,
+            BUILD_SALES_GUIDANCE,
+            ENSURE_SESSION_ID,
+        ]):
+            self._send_json(500, {"error": "服务端模块未就绪"})
+            return
 
-        data = request.get_json(silent=True)
-        if data is None:
-            return _json_response({"error": "JSON 格式错误"}, 400)
+        try:
+            content_length = int(self.headers.get("Content-Length", "0") or "0")
+            raw = self.rfile.read(content_length) if content_length > 0 else b"{}"
+            try:
+                data = json.loads(raw.decode("utf-8")) if raw else {}
+            except Exception:
+                self._send_json(400, {"error": "JSON 格式错误"})
+                return
 
-        current_api_key = _extract_api_key(data)
-        if not current_api_key:
-            return _json_response({"error": "服务端未配置 MOONSHOT_API_KEY"}, 500)
+            client_api_key = _normalize_api_key(self.headers.get("X-API-Key", ""))
+            auth_header = (self.headers.get("Authorization", "") or "").strip()
+            if auth_header.lower().startswith("bearer "):
+                bearer_key = _normalize_api_key(auth_header.split(" ", 1)[1].strip())
+                if bearer_key:
+                    client_api_key = bearer_key
 
-        user_message = (data.get("message", "") or "").strip()
-        if not user_message:
-            return _json_response({"error": "message 不能为空"}, 400)
+            body_key = _normalize_api_key(str(data.get("api_key") or data.get("apiKey") or data.get("key") or ""))
+            current_api_key = API_KEY or client_api_key or body_key
+            if not current_api_key:
+                self._send_json(500, {"error": "服务端未配置 MOONSHOT_API_KEY"})
+                return
 
-        safe_history = _normalize_history(data.get("history", []))
-        session_id = ensure_session_id(data.get("session_id") or request.headers.get("X-Session-Id"))
+            user_message = (data.get("message", "") or "").strip()
+            if not user_message:
+                self._send_json(400, {"error": "message 不能为空"})
+                return
 
-        pre_analysis = analyze_turn(user_message, safe_history, session_id)
-        lead_profile = _safe_merge_lead_profile(session_id, pre_analysis.get("extracted_lead", {}))
-        sales_guidance = build_sales_guidance(pre_analysis, lead_profile)
-        policy_prompt = build_policy_prompt(user_message, safe_history)
+            safe_history = _normalize_history(data.get("history", []))
+            session_id = ENSURE_SESSION_ID(data.get("session_id") or self.headers.get("X-Session-Id"))
 
-        system_prompt = f"""
+            pre_analysis = ANALYZE_TURN(user_message, safe_history, session_id)
+            lead_profile = _safe_merge_lead_profile(session_id, pre_analysis.get("extracted_lead", {}))
+            sales_guidance = BUILD_SALES_GUIDANCE(pre_analysis, lead_profile)
+            policy_prompt = BUILD_POLICY_PROMPT(user_message, safe_history)
+
+            system_prompt = f"""
 你是浙江信义企业管理有限公司的智能顾问，名字叫'信义智能助手'。
 请基于以下【公司知识库】内容，专业、热情地回答客户问题。
 
@@ -248,127 +233,110 @@ def chat():
 9. 不要机械按字面关键词回答，要结合咨询场景、上下文和用户最终目的做推理。
 10. 若用户行业/企业身份疑似切换，先澄清“同一公司新业务还是另一家企业”，再给方案。
 """
-        system_prompt = f"{system_prompt}\n{sales_guidance}"
-        if policy_prompt:
-            system_prompt = f"{system_prompt}\n{policy_prompt}"
+            system_prompt = f"{system_prompt}\n{sales_guidance}"
+            if policy_prompt:
+                system_prompt = f"{system_prompt}\n{policy_prompt}"
 
-        messages: List[Dict[str, str]] = [{"role": "system", "content": system_prompt}]
-        messages.extend(safe_history)
-        messages.append({"role": "user", "content": user_message})
+            messages: List[Dict[str, str]] = [{"role": "system", "content": system_prompt}]
+            messages.extend(safe_history)
+            messages.append({"role": "user", "content": user_message})
 
-        payload = {
-            "model": MOONSHOT_MODEL,
-            "messages": messages,
-            "temperature": 0.2,
-        }
+            payload = {
+                "model": MOONSHOT_MODEL,
+                "messages": messages,
+                "temperature": 0.2,
+            }
 
-        resp = requests.post(
-            MOONSHOT_API_URL,
-            json=payload,
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {current_api_key}",
-            },
-            timeout=REQUEST_TIMEOUT_SECONDS,
-            verify=_resolve_verify_setting(),
-        )
-
-        if resp.status_code >= 400:
-            detail = (resp.text or "")[:300]
-            _safe_append_turn_log(
-                session_id=session_id or "unknown",
-                user_message=user_message,
-                assistant_reply="",
-                analysis=pre_analysis,
-                model=MOONSHOT_MODEL,
-                ok=False,
-                error=f"HTTPError:{resp.status_code}",
-            )
-            return _json_response({"error": "上游模型服务调用失败", "detail": detail}, resp.status_code)
-
-        provider_data = resp.json()
-        reply = ""
-        if provider_data.get("choices"):
-            message = provider_data["choices"][0].get("message", {})
-            reply = message.get("content", "")
-        reply = enforce_policy_reply(user_message, safe_history, reply)
-
-        _safe_append_turn_log(
-            session_id=session_id,
-            user_message=user_message,
-            assistant_reply=reply,
-            analysis=pre_analysis,
-            model=provider_data.get("model", MOONSHOT_MODEL),
-            ok=True,
-        )
-
-        return _json_response(
-            {
-                "reply": reply,
-                "choices": provider_data.get("choices", []),
-                "model": provider_data.get("model", MOONSHOT_MODEL),
-                "session_id": session_id,
-                "sales": {
-                    "intent": pre_analysis.get("intent"),
-                    "lead_tier": pre_analysis.get("lead_tier"),
-                    "lead_score": pre_analysis.get("lead_score"),
-                    "next_action": pre_analysis.get("next_action"),
-                    "missing_fields": pre_analysis.get("missing_fields"),
+            req = urllib.request.Request(
+                MOONSHOT_API_URL,
+                data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {current_api_key}",
                 },
-            },
-            200,
-        )
+                method="POST",
+            )
 
-    except requests.exceptions.SSLError:
-        _safe_append_turn_log(
-            session_id=session_id or "unknown",
-            user_message=user_message,
-            assistant_reply="",
-            analysis=pre_analysis,
-            model=MOONSHOT_MODEL,
-            ok=False,
-            error="SSLError",
-        )
-        return _json_response(
-            {
-                "error": "SSL 证书校验失败，请在服务端配置可信 CA（SSL_CERT_FILE / MOONSHOT_CA_BUNDLE），或仅在本地调试时设置 MOONSHOT_INSECURE_SKIP_VERIFY=1"
-            },
-            502,
-        )
-    except requests.exceptions.Timeout:
-        _safe_append_turn_log(
-            session_id=session_id or "unknown",
-            user_message=user_message,
-            assistant_reply="",
-            analysis=pre_analysis,
-            model=MOONSHOT_MODEL,
-            ok=False,
-            error="Timeout",
-        )
-        return _json_response({"error": "上游模型服务超时，请稍后重试"}, 504)
-    except requests.exceptions.RequestException as e:
-        _safe_append_turn_log(
-            session_id=session_id or "unknown",
-            user_message=user_message,
-            assistant_reply="",
-            analysis=pre_analysis,
-            model=MOONSHOT_MODEL,
-            ok=False,
-            error=f"RequestException:{str(e)[:120]}",
-        )
-        return _json_response({"error": f"上游网络连接失败: {str(e)[:160]}"}, 502)
-    except Exception:
-        _safe_append_turn_log(
-            session_id=session_id or "unknown",
-            user_message=user_message,
-            assistant_reply="",
-            analysis=pre_analysis,
-            model=MOONSHOT_MODEL,
-            ok=False,
-            error="InternalError",
-        )
-        return _json_response({"error": "服务暂时不可用，请稍后重试"}, 500)
+            try:
+                with urllib.request.urlopen(
+                    req,
+                    timeout=REQUEST_TIMEOUT_SECONDS,
+                    context=_resolve_ssl_context(),
+                ) as resp:
+                    resp_body = resp.read().decode("utf-8", errors="ignore")
+                    provider_data = json.loads(resp_body)
+            except urllib.error.HTTPError as e:
+                detail = ""
+                try:
+                    detail = (e.read().decode("utf-8", errors="ignore") or "")[:300]
+                except Exception:
+                    detail = str(e)[:300]
+                _safe_append_turn_log(
+                    session_id=session_id or "unknown",
+                    user_message=user_message,
+                    assistant_reply="",
+                    analysis=pre_analysis,
+                    model=MOONSHOT_MODEL,
+                    ok=False,
+                    error=f"HTTPError:{e.code}",
+                )
+                self._send_json(e.code or 502, {"error": "上游模型服务调用失败", "detail": detail})
+                return
+            except urllib.error.URLError as e:
+                _safe_append_turn_log(
+                    session_id=session_id or "unknown",
+                    user_message=user_message,
+                    assistant_reply="",
+                    analysis=pre_analysis,
+                    model=MOONSHOT_MODEL,
+                    ok=False,
+                    error=f"URLError:{str(e.reason)[:120]}",
+                )
+                self._send_json(502, {"error": f"上游网络连接失败: {str(e.reason)[:160]}"})
+                return
+            except TimeoutError:
+                _safe_append_turn_log(
+                    session_id=session_id or "unknown",
+                    user_message=user_message,
+                    assistant_reply="",
+                    analysis=pre_analysis,
+                    model=MOONSHOT_MODEL,
+                    ok=False,
+                    error="Timeout",
+                )
+                self._send_json(504, {"error": "上游模型服务超时，请稍后重试"})
+                return
 
+            reply = ""
+            if isinstance(provider_data, dict) and provider_data.get("choices"):
+                message = provider_data["choices"][0].get("message", {})
+                reply = message.get("content", "") if isinstance(message, dict) else ""
+            reply = ENFORCE_POLICY_REPLY(user_message, safe_history, reply)
 
-# Vercel Python runtime uses this WSGI app entry.
-handler = app
+            _safe_append_turn_log(
+                session_id=session_id,
+                user_message=user_message,
+                assistant_reply=reply,
+                analysis=pre_analysis,
+                model=provider_data.get("model", MOONSHOT_MODEL) if isinstance(provider_data, dict) else MOONSHOT_MODEL,
+                ok=True,
+            )
+
+            self._send_json(
+                200,
+                {
+                    "reply": reply,
+                    "choices": provider_data.get("choices", []) if isinstance(provider_data, dict) else [],
+                    "model": provider_data.get("model", MOONSHOT_MODEL) if isinstance(provider_data, dict) else MOONSHOT_MODEL,
+                    "session_id": session_id,
+                    "sales": {
+                        "intent": pre_analysis.get("intent"),
+                        "lead_tier": pre_analysis.get("lead_tier"),
+                        "lead_score": pre_analysis.get("lead_score"),
+                        "next_action": pre_analysis.get("next_action"),
+                        "missing_fields": pre_analysis.get("missing_fields"),
+                    },
+                },
+            )
+        except Exception:
+            self._send_json(500, {"error": "服务暂时不可用，请稍后重试"})
