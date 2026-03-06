@@ -244,7 +244,6 @@ class handler(BaseHTTPRequestHandler):
             payload = {
                 "model": MOONSHOT_MODEL,
                 "messages": messages,
-                "temperature": 0.2,
             }
 
             req = urllib.request.Request(
