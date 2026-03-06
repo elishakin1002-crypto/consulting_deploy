@@ -275,7 +275,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             this.input.focus();
             this.scrollToBottom();
-            this.promptApiKeyIfNeeded();
         },
 
         closeChatWindow(persist = true) {
@@ -519,11 +518,8 @@ document.addEventListener('DOMContentLoaded', function() {
         },
 
         promptApiKeyIfNeeded(force = false) {
-            if (!this.apiKeyModal) return;
-            const hasSavedKey = !!this.getSavedClientApiKey();
-            if (hasSavedKey) return;
-            if (!force && localStorage.getItem(this.apiPromptDismissKey) === '1') return;
-            this.openApiKeyModal();
+            // 企业部署模式：优先使用服务端环境变量，不再强制用户输入 API Key。
+            return;
         },
 
         async sendMessage(text) {
