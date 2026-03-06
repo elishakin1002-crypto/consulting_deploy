@@ -1,22 +1,22 @@
 {
-    "$schema": "https://openapi.vercel.sh/vercel.json",
-    "functions": {
-        "api/*.py": {
-            "maxDuration": 60
-        }
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/index.py": {
+      "maxDuration": 60
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/chat",
+      "destination": "/api/index.py"
     },
-    "rewrites": [
-        {
-            "source": "/api/chat",
-            "destination": "/api/index.py"
-        },
-        {
-            "source": "/",
-            "destination": "/public/index.html"
-        },
-        {
-            "source": "/(.*)",
-            "destination": "/public/$1"
-        }
-    ]
+    {
+      "source": "/",
+      "destination": "/public/index.html"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/public/$1"
+    }
+  ]
 }
