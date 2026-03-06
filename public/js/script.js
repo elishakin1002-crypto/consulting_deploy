@@ -269,6 +269,10 @@ document.addEventListener('DOMContentLoaded', function() {
             this.window.classList.add('active');
             if (persist) localStorage.setItem(this.windowStateStorageKey, '1');
             this.touchActive();
+            // 在移动端隐藏悬浮球
+            if (window.innerWidth <= 480) {
+                this.toggle.classList.add('hidden');
+            }
             this.input.focus();
             this.scrollToBottom();
             this.promptApiKeyIfNeeded();
@@ -276,6 +280,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         closeChatWindow(persist = true) {
             this.window.classList.remove('active');
+            // 恢复显示悬浮球
+            this.toggle.classList.remove('hidden');
             if (persist) localStorage.setItem(this.windowStateStorageKey, '0');
             this.touchActive();
             if (this.isListening) this.stopVoiceInput();
@@ -284,12 +290,20 @@ document.addEventListener('DOMContentLoaded', function() {
         toggleChatWindow() {
             if (this.window.classList.contains('active')) {
                 this.closeChatWindow();
+                this.toggle.classList.remove('hidden'); // 显示悬浮球
             } else {
                 this.openChatWindow();
+                // 在移动端隐藏悬浮球，防止遮挡
+                if (window.innerWidth <= 480) {
+                    this.toggle.classList.add('hidden');
+                }
             }
         },
 
         restoreChatWindowState() {
+            // 移动端不自动恢复打开状态，以免遮挡屏幕
+            if (window.innerWidth <= 480) return;
+            
             if (localStorage.getItem(this.windowStateStorageKey) === '1') {
                 this.openChatWindow(false);
             } else {
