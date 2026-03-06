@@ -33,11 +33,11 @@ def _normalize_api_key(raw_value: str) -> str:
 
 
 def _safe_timeout_seconds() -> float:
-    raw = os.environ.get("UPSTREAM_TIMEOUT_SECONDS", "15")
+    raw = os.environ.get("UPSTREAM_TIMEOUT_SECONDS", "30")
     try:
-        return max(3.0, float(raw))
+        return max(5.0, float(raw))
     except Exception:
-        return 15.0
+        return 30.0
 
 
 def _load_module_from_file(module_name: str):
