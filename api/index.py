@@ -40,6 +40,44 @@ def _safe_timeout_seconds() -> float:
         return 30.0
 
 
+def _safe_retry_attempts() -> int:
+    raw = os.environ.get("UPSTREAM_RETRY_ATTEMPTS", "3")
+    try:
+        return max(1, min(5, int(raw)))
+    except Exception:
+        return 3
+
+
+def _safe_retry_backoff_seconds() -> float:
+    raw = os.environ.get("UPSTREAM_RETRY_BACKOFF_SECONDS", "0.8")
+    try:
+        return max(0.2, min(5.0, float(raw)))
+    except Exception:
+        return 0.8
+
+
+def _is_retryable_upstream_error(http_code: int, detail: str) -> bool:
+    normalized = (detail or "").lower()
+    if http_code in (429, 500, 502, 503, 504):
+        return True
+    return any(
+        token in normalized
+        for token in (
+            "engine_overloaded_error",
+            "overloaded",
+            "rate limit",
+            "temporarily unavailable",
+            "try again later",
+            "service unavailable",
+        )
+    )
+
+
+def _build_retry_delay(attempt_index: int) -> float:
+    base = _safe_retry_backoff_seconds()
+    return base * float(attempt_index + 1)
+
+
 def _load_module_from_file(module_name: str):
     current_dir = os.path.dirname(__file__)
     file_path = os.path.join(current_dir, f"{module_name}.py")
@@ -89,6 +127,7 @@ CUSTOM_CA_FILE = (
     or ""
 ).strip()
 REQUEST_TIMEOUT_SECONDS = _safe_timeout_seconds()
+UPSTREAM_RETRY_ATTEMPTS = _safe_retry_attempts()
 
 
 _boot_modules()
@@ -241,35 +280,65 @@ class handler(BaseHTTPRequestHandler):
             messages.extend(safe_history)
             messages.append({"role": "user", "content": user_message})
 
-            payload = {
-                "model": MOONSHOT_MODEL,
-                "messages": messages,
-            }
+            provider_data: Dict[str, Any] = {}
+            last_error_code = 0
+            last_error_detail = ""
+            for attempt_index in range(UPSTREAM_RETRY_ATTEMPTS):
+                payload = {
+                    "model": MOONSHOT_MODEL,
+                    "messages": messages,
+                }
+                req = urllib.request.Request(
+                    MOONSHOT_API_URL,
+                    data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                    headers={
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bearer {current_api_key}",
+                    },
+                    method="POST",
+                )
 
-            req = urllib.request.Request(
-                MOONSHOT_API_URL,
-                data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {current_api_key}",
-                },
-                method="POST",
-            )
-
-            try:
-                with urllib.request.urlopen(
-                    req,
-                    timeout=REQUEST_TIMEOUT_SECONDS,
-                    context=_resolve_ssl_context(),
-                ) as resp:
-                    resp_body = resp.read().decode("utf-8", errors="ignore")
-                    provider_data = json.loads(resp_body)
-            except urllib.error.HTTPError as e:
-                detail = ""
                 try:
-                    detail = (e.read().decode("utf-8", errors="ignore") or "")[:300]
-                except Exception:
-                    detail = str(e)[:300]
+                    with urllib.request.urlopen(
+                        req,
+                        timeout=REQUEST_TIMEOUT_SECONDS,
+                        context=_resolve_ssl_context(),
+                    ) as resp:
+                        resp_body = resp.read().decode("utf-8", errors="ignore")
+                        provider_data = json.loads(resp_body)
+                        last_error_code = 0
+                        last_error_detail = ""
+                        break
+                except urllib.error.HTTPError as e:
+                    try:
+                        detail = (e.read().decode("utf-8", errors="ignore") or "")[:300]
+                    except Exception:
+                        detail = str(e)[:300]
+                    last_error_code = int(e.code or 502)
+                    last_error_detail = detail
+                    if _is_retryable_upstream_error(last_error_code, detail) and attempt_index < UPSTREAM_RETRY_ATTEMPTS - 1:
+                        time.sleep(_build_retry_delay(attempt_index))
+                        continue
+                    break
+                except urllib.error.URLError as e:
+                    last_error_code = 502
+                    last_error_detail = str(e.reason)[:160]
+                    if attempt_index < UPSTREAM_RETRY_ATTEMPTS - 1:
+                        time.sleep(_build_retry_delay(attempt_index))
+                        continue
+                    break
+                except TimeoutError:
+                    last_error_code = 504
+                    last_error_detail = "timeout"
+                    if attempt_index < UPSTREAM_RETRY_ATTEMPTS - 1:
+                        time.sleep(_build_retry_delay(attempt_index))
+                        continue
+                    break
+
+            if not provider_data:
+                error_tag = "UpstreamError"
+                if last_error_code:
+                    error_tag = f"HTTPError:{last_error_code}"
                 _safe_append_turn_log(
                     session_id=session_id or "unknown",
                     user_message=user_message,
@@ -277,33 +346,24 @@ class handler(BaseHTTPRequestHandler):
                     analysis=pre_analysis,
                     model=MOONSHOT_MODEL,
                     ok=False,
-                    error=f"HTTPError:{e.code}",
+                    error=error_tag,
                 )
-                self._send_json(e.code or 502, {"error": "上游模型服务调用失败", "detail": detail})
-                return
-            except urllib.error.URLError as e:
-                _safe_append_turn_log(
-                    session_id=session_id or "unknown",
-                    user_message=user_message,
-                    assistant_reply="",
-                    analysis=pre_analysis,
-                    model=MOONSHOT_MODEL,
-                    ok=False,
-                    error=f"URLError:{str(e.reason)[:120]}",
-                )
-                self._send_json(502, {"error": f"上游网络连接失败: {str(e.reason)[:160]}"})
-                return
-            except TimeoutError:
-                _safe_append_turn_log(
-                    session_id=session_id or "unknown",
-                    user_message=user_message,
-                    assistant_reply="",
-                    analysis=pre_analysis,
-                    model=MOONSHOT_MODEL,
-                    ok=False,
-                    error="Timeout",
-                )
-                self._send_json(504, {"error": "上游模型服务超时，请稍后重试"})
+                if _is_retryable_upstream_error(last_error_code, last_error_detail):
+                    self._send_json(
+                        503,
+                        {
+                            "error": f"上游模型繁忙，已自动重试 {UPSTREAM_RETRY_ATTEMPTS} 次，请稍后再试",
+                            "detail": last_error_detail,
+                        },
+                    )
+                    return
+                if last_error_code == 504:
+                    self._send_json(504, {"error": "上游模型服务超时，请稍后重试"})
+                    return
+                if last_error_code == 502:
+                    self._send_json(502, {"error": f"上游网络连接失败: {last_error_detail}"})
+                    return
+                self._send_json(last_error_code or 502, {"error": "上游模型服务调用失败", "detail": last_error_detail})
                 return
 
             reply = ""
@@ -334,6 +394,7 @@ class handler(BaseHTTPRequestHandler):
                         "lead_score": pre_analysis.get("lead_score"),
                         "next_action": pre_analysis.get("next_action"),
                         "missing_fields": pre_analysis.get("missing_fields"),
+                        "lead_profile": lead_profile,
                     },
                 },
             )

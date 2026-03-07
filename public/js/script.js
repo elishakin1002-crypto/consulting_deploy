@@ -147,6 +147,8 @@ document.addEventListener('DOMContentLoaded', function() {
         apiPromptDismissKey: 'moonshot_api_prompt_dismissed_v1',
         historyStorageKey: 'ai_chat_history_v1',
         messageStorageKey: 'ai_chat_messages_v1',
+        leadStorageKey: 'ai_chat_lead_profile_v1',
+        leadAckStorageKey: 'ai_chat_lead_ack_v1',
         windowStateStorageKey: 'ai_chat_open_v1',
         lastActiveStorageKey: 'ai_chat_last_active_v1',
         defaultWelcomeText: '您好！我是信义企业管理的智能助手。有什么我可以帮您的吗？我可以回答关于体系认证、产品认证或政府项目申报的问题。',
@@ -172,6 +174,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             this.history = this.loadHistory();
             this.messageLog = this.loadMessageLog();
+            this.leadProfile = this.loadLeadProfile();
             if (this.messageLog.length === 0) {
                 this.messageLog = [{ type: 'ai', text: this.defaultWelcomeText }];
                 this.saveMessageLog();
@@ -244,6 +247,90 @@ document.addEventListener('DOMContentLoaded', function() {
             return data.filter((item) => {
                 return item && (item.type === 'user' || item.type === 'ai') && typeof item.text === 'string' && item.text.trim();
             }).slice(-this.maxMessageEntries);
+        },
+
+        loadLeadProfile() {
+            try {
+                const raw = localStorage.getItem(this.leadStorageKey);
+                if (!raw) return {};
+                const parsed = JSON.parse(raw);
+                return parsed && typeof parsed === 'object' ? parsed : {};
+            } catch (_) {
+                return {};
+            }
+        },
+
+        saveLeadProfile() {
+            localStorage.setItem(this.leadStorageKey, JSON.stringify(this.leadProfile || {}));
+        },
+
+        extractLeadFields(text) {
+            const content = (text || '').trim();
+            if (!content) return {};
+            const lead = {};
+            const phoneMatch = content.match(/(?:\+?86[-\s]?)?(1[3-9]\d{9})/);
+            if (phoneMatch) lead.phone = phoneMatch[1];
+            const emailMatch = content.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/);
+            if (emailMatch) lead.email = emailMatch[0];
+            const nameMatch = content.match(/(?:我叫|我是|联系人[:：]?)([^\s，。,.]{2,16})/);
+            if (nameMatch) lead.contact_name = nameMatch[1];
+            return lead;
+        },
+
+        buildLeadSignature(lead) {
+            if (!lead || typeof lead !== 'object') return '';
+            const phone = (lead.phone || '').trim();
+            const email = (lead.email || '').trim();
+            const name = (lead.contact_name || '').trim();
+            return [name, phone, email].join('|');
+        },
+
+        mergeLeadProfile(partialLead) {
+            const merged = { ...(this.leadProfile || {}) };
+            if (partialLead && typeof partialLead === 'object') {
+                Object.keys(partialLead).forEach((key) => {
+                    const value = partialLead[key];
+                    if (typeof value === 'string' && value.trim()) {
+                        merged[key] = value.trim();
+                    }
+                });
+            }
+            this.leadProfile = merged;
+            this.saveLeadProfile();
+            return merged;
+        },
+
+        maybeAcknowledgeLeadCapture(lead, triggerText = '') {
+            if (!lead || typeof lead !== 'object') return;
+            const hasContact = !!(lead.phone || lead.email);
+            if (!hasContact) return;
+
+            const userProvided = this.extractLeadFields(triggerText);
+            if (!userProvided.phone && !userProvided.email && !userProvided.contact_name) return;
+
+            const signature = this.buildLeadSignature(lead);
+            if (!signature) return;
+            if (localStorage.getItem(this.leadAckStorageKey) === signature) return;
+
+            const contactBits = [];
+            if (lead.contact_name) contactBits.push(`姓名：${lead.contact_name}`);
+            if (lead.phone) contactBits.push(`电话：${lead.phone}`);
+            if (lead.email) contactBits.push(`邮箱：${lead.email}`);
+            this.addMessage(`已收到并记录您的联系方式（${contactBits.join('，')}）。顾问将尽快与您联系。`, 'ai');
+            localStorage.setItem(this.leadAckStorageKey, signature);
+        },
+
+        startFreeConsultFlow() {
+            this.openChatWindow();
+            const leadPrompt = '免费咨询已开启。请直接输入【姓名 + 电话（或微信/邮箱）+ 需求】，我会立即为您登记并安排顾问联系。';
+            const lastMessage = this.messageLog.length ? this.messageLog[this.messageLog.length - 1] : null;
+            if (!lastMessage || lastMessage.type !== 'ai' || lastMessage.text !== leadPrompt) {
+                this.addMessage(leadPrompt, 'ai');
+            }
+            if (this.input) {
+                this.input.placeholder = '例如：我叫张三，电话138xxxx8888，想办SC食品生产许可';
+                this.input.focus();
+            }
         },
 
         saveMessageLog() {
@@ -555,15 +642,20 @@ document.addEventListener('DOMContentLoaded', function() {
                     const detail = data.detail ? `（${data.detail}）` : '';
                     this.addMessage(`连接失败：${errMsg}${detail}`, 'ai');
                     const diagnoseText = `${errMsg} ${data.detail || ''}`.toLowerCase();
+                    const isEngineBusy = diagnoseText.includes('engine_overloaded') || diagnoseText.includes('overloaded') || diagnoseText.includes('繁忙');
+                    const isServerConfigIssue = diagnoseText.includes('moonshot_api_key') || diagnoseText.includes('api key') || diagnoseText.includes('unauthorized') || diagnoseText.includes('invalid');
                     if (
-                        diagnoseText.includes('moonshot_api_key') ||
-                        diagnoseText.includes('api key') ||
-                        diagnoseText.includes('unauthorized') ||
-                        diagnoseText.includes('invalid')
+                        isServerConfigIssue
                     ) {
                         this.promptApiKeyIfNeeded(true);
                     }
-                    this.mockAIResponse(text);
+                    if (isEngineBusy || isServerConfigIssue || response.status >= 500) {
+                        return;
+                    }
+                    const isMockMode = !savedClientKey && localStorage.getItem(this.apiPromptDismissKey) === '1';
+                    if (isMockMode) {
+                        this.mockAIResponse(text);
+                    }
                     return;
                 }
 
@@ -587,6 +679,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         this.history = this.history.slice(-this.maxHistoryEntries);
                     }
                     this.saveHistory();
+                    const mergedLead = this.mergeLeadProfile({
+                        ...this.extractLeadFields(text),
+                        ...(data && data.sales && typeof data.sales.lead_profile === 'object' ? data.sales.lead_profile : {}),
+                    });
+                    this.maybeAcknowledgeLeadCapture(mergedLead, text);
                 } else {
                     this.mockAIResponse(text);
                 }
@@ -594,7 +691,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('Network Error:', error);
                 this.removeTyping();
                 this.addMessage('网络连接异常，请检查您的网络设置。', 'ai');
-                this.mockAIResponse(text);
+                const isMockMode = !this.getSavedClientApiKey() && localStorage.getItem(this.apiPromptDismissKey) === '1';
+                if (isMockMode) {
+                    this.mockAIResponse(text);
+                }
             }
         },
 
@@ -655,7 +755,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!text) return;
 
         const autoSend = options.autoSend !== false;
-        const hasKey = !!this.getSavedClientApiKey();
 
         this.openChatWindow();
         if (this.input) {
@@ -663,8 +762,7 @@ document.addEventListener('DOMContentLoaded', function() {
             this.input.focus();
         }
 
-        // 没有 Key 时先让用户保存 Key，再由用户手动发送，避免“连接失败”的挫败感。
-        if (!autoSend || !hasKey) return;
+        if (!autoSend) return;
 
         this.addMessage(text, 'user');
         if (this.input) this.input.value = '';
@@ -740,8 +838,17 @@ document.addEventListener('DOMContentLoaded', function() {
     window.XINYI_AI = {
         open: () => aiWidget.openChatWindow(),
         ask: (text, options) => aiWidget.ask(text, options),
+        startConsult: () => aiWidget.startFreeConsultFlow(),
         reset: () => aiWidget.resetConversation(true),
     };
+
+    // 首页“免费咨询”直接进入机器人留资流程
+    document.querySelectorAll('.js-open-ai-consult').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            aiWidget.startFreeConsultFlow();
+        });
+    });
 
     aiWidget.init();
 });
