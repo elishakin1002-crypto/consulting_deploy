@@ -238,12 +238,15 @@ nav ul li a.active::after {
 
 /* Hero 区域 - 高端商务风格 */
 .hero {
-    /* 使用多重渐变模拟高端背景 */
-    background: 
-        linear-gradient(135deg, rgba(0, 43, 73, 0.95) 0%, rgba(0, 26, 45, 0.98) 100%),
-        repeating-linear-gradient(45deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 1px, transparent 1px, transparent 20px);
-    background-size: cover;
-    background-position: center;
+    /* 在深色蒙版下叠加官网背景图，保持“隐约可见” */
+    background-image:
+        linear-gradient(135deg, rgba(0, 43, 73, 0.74) 0%, rgba(0, 26, 45, 0.86) 100%),
+        linear-gradient(180deg, rgba(0, 43, 73, 0.18) 0%, rgba(0, 26, 45, 0.35) 100%),
+        url('../img/hero-bg-2.webp'),
+        repeating-linear-gradient(45deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 20px);
+    background-size: cover, cover, cover, auto;
+    background-position: center, center, center, center;
+    background-repeat: no-repeat, no-repeat, no-repeat, repeat;
     color: white;
     text-align: center;
     padding: 180px 0 140px;
@@ -499,7 +502,13 @@ nav ul li a.active::after {
 
 /* 行动召唤区域 */
 .cta {
-    background: var(--primary-color);
+    background-image:
+        linear-gradient(135deg, rgba(0, 43, 73, 0.78) 0%, rgba(0, 26, 45, 0.88) 100%),
+        linear-gradient(180deg, rgba(0, 43, 73, 0.15) 0%, rgba(0, 26, 45, 0.28) 100%),
+        url('../img/cta-contact-bg.webp');
+    background-size: cover, cover, cover;
+    background-position: center, center, center;
+    background-repeat: no-repeat, no-repeat, no-repeat;
     color: white;
     text-align: center;
     padding: 100px 0;
@@ -514,7 +523,7 @@ nav ul li a.active::after {
     left: 0;
     width: 100%;
     height: 100%;
-    background: repeating-linear-gradient(90deg, transparent 0, transparent 50px, rgba(255,255,255,0.02) 50px, rgba(255,255,255,0.02) 51px);
+    background: repeating-linear-gradient(90deg, transparent 0, transparent 50px, rgba(255,255,255,0.018) 50px, rgba(255,255,255,0.018) 51px);
     pointer-events: none;
 }
 
