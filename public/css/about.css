@@ -120,11 +120,14 @@
 
 .member-image {
     overflow: hidden;
+    aspect-ratio: 4 / 5;
 }
 
 .member-image img {
     width: 100%;
-    height: auto;
+    height: 100%;
+    object-fit: cover;
+    object-position: center top;
     transition: var(--transition);
 }
 
