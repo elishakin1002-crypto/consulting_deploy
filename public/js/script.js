@@ -49,8 +49,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
                 <div class="chat-messages" id="chatMessages">
                     <div class="message ai">
-                        您好！我是信义企业管理的智能助手。有什么我可以帮您的吗？<br>
-                        我可以回答关于体系认证、产品认证或政府项目申报的问题。
+                        您好！我是信义智能助手。有什么我可以帮您的吗？<br>
+                        我可以为您梳理认证/许可办理顺序、资料清单与周期预估。
                     </div>
                 </div>
                 <div class="chat-input-area">
@@ -151,7 +151,7 @@ document.addEventListener('DOMContentLoaded', function() {
         leadAckStorageKey: 'ai_chat_lead_ack_v1',
         windowStateStorageKey: 'ai_chat_open_v1',
         lastActiveStorageKey: 'ai_chat_last_active_v1',
-        defaultWelcomeText: '您好！我是信义企业管理的智能助手。有什么我可以帮您的吗？我可以回答关于体系认证、产品认证或政府项目申报的问题。',
+        defaultWelcomeText: '您好！我是信义智能助手。有什么我可以帮您的吗？我可以为您梳理认证/许可办理顺序、资料清单与周期预估。',
         maxHistoryEntries: 20,
         maxMessageEntries: 80,
         sessionTimeoutMs: 30 * 60 * 1000,
@@ -739,11 +739,13 @@ document.addEventListener('DOMContentLoaded', function() {
             let reply = '抱歉，我暂时无法回答这个问题。您可以拨打我们的热线：+86 13676797588';
 
             if (userText.includes('认证') || userText.includes('体系')) {
-                reply = '我们提供 ISO9001、ISO14001 等多种体系认证服务。需要具体报价吗？';
+                reply = '我们可协助 ISO9001/14001/45001、ISO22000、IATF16949 等认证。您告诉我行业和目标，我先给您办理顺序。';
             } else if (userText.includes('你好') || userText.includes('在吗')) {
-                reply = '您好！我是信义智能助手，很高兴为您服务。';
+                reply = '您好！我是信义智能助手，很高兴为您服务。您可以直接说行业和需求，我来帮您先排优先级。';
             } else if (userText.includes('价格') || userText.includes('多少钱')) {
-                reply = '具体费用根据企业规模而定，建议您留下联系方式，我们的顾问会为您详细评估。';
+                reply = '费用与行业、现状和目标节点相关。建议您留下电话，我们可先做初评，再给您明确报价范围。';
+            } else if (userText.includes('怎么弄') || userText.includes('怎么办')) {
+                reply = '可以，我先按您的业务场景给您分“必办项”和“建议项”。您补充下产品类型或目标市场，我马上为您细化。';
             }
 
             this.addMessage(reply, 'ai');
