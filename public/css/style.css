@@ -405,7 +405,12 @@ nav ul li a.active::after {
 .about-image-placeholder {
     width: 100%;
     height: 400px;
-    background: linear-gradient(45deg, var(--primary-light), var(--primary-color));
+    background:
+        linear-gradient(135deg, rgba(19, 54, 82, 0.28), rgba(6, 39, 66, 0.42)),
+        url('../img/home-about-right.jpg');
+    background-size: cover;
+    background-position: center center;
+    background-repeat: no-repeat;
     border-radius: var(--radius);
     position: relative;
     box-shadow: var(--shadow-md);
