@@ -4,31 +4,12 @@ document.addEventListener('DOMContentLoaded', function() {
     function ensureAIWidgetMarkup() {
         const hasToggle = document.getElementById('aiWidgetToggle');
         const hasChatWindow = document.getElementById('aiChatWindow');
-        const hasModal = document.getElementById('apiKeyModal');
-        if (hasToggle && hasChatWindow && hasModal) return;
+        if (hasToggle && hasChatWindow) return;
 
         const wrapper = document.createElement('div');
         wrapper.innerHTML = `
-            <div class="ai-widget-toggle" id="aiWidgetToggle" title="咨询 AI 助手">
+            <div class="ai-widget-toggle" id="aiWidgetToggle" title="智能咨询">
                 <i class="fas fa-robot"></i>
-            </div>
-
-            <div class="api-key-modal" id="apiKeyModal">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h3>配置 Kimi API Key</h3>
-                        <button class="close-modal" id="closeApiModal">&times;</button>
-                    </div>
-                    <div class="modal-body">
-                        <p>为了使用真实的 AI 对话功能，请输入您的 Moonshot API Key。</p>
-                        <p class="api-note">您的 Key 仅存储在本地，不会发送给第三方。</p>
-                        <input type="password" id="apiKeyInput" placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
-                        <div class="modal-actions">
-                            <button class="btn-cancel" id="cancelApiKey">使用模拟模式</button>
-                            <button class="btn-save" id="saveApiKey">保存并启用</button>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             <div class="ai-chat-window" id="aiChatWindow">
@@ -40,7 +21,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="header-text">
                             <h3>信义智能助手</h3>
                             <span class="status-dot"></span>
-                            <span class="status-text">Kimi 2.5 在线</span>
+                            <span class="status-text">在线</span>
                         </div>
                     </div>
                     <button class="close-chat" id="closeChat">
@@ -138,13 +119,6 @@ document.addEventListener('DOMContentLoaded', function() {
         input: document.getElementById('chatInput'),
         sendBtn: document.getElementById('sendBtn'),
         messagesContainer: document.getElementById('chatMessages'),
-        apiKeyModal: document.getElementById('apiKeyModal'),
-        apiKeyInput: document.getElementById('apiKeyInput'),
-        closeApiModalBtn: document.getElementById('closeApiModal'),
-        cancelApiKeyBtn: document.getElementById('cancelApiKey'),
-        saveApiKeyBtn: document.getElementById('saveApiKey'),
-        apiKeyStorageKey: 'moonshot_api_key',
-        apiPromptDismissKey: 'moonshot_api_prompt_dismissed_v1',
         historyStorageKey: 'ai_chat_history_v1',
         messageStorageKey: 'ai_chat_messages_v1',
         leadStorageKey: 'ai_chat_lead_profile_v1',
@@ -175,6 +149,12 @@ document.addEventListener('DOMContentLoaded', function() {
             this.history = this.loadHistory();
             this.messageLog = this.loadMessageLog();
             this.leadProfile = this.loadLeadProfile();
+            // 清理旧版遗留本地数据，避免影响当前对话流程。
+            Object.keys(localStorage).forEach((key) => {
+                if (/(_api_key$)|(^api_key$)|(_api_prompt_dismissed(_v\d+)?$)/i.test(key)) {
+                    localStorage.removeItem(key);
+                }
+            });
             if (this.messageLog.length === 0) {
                 this.messageLog = [{ type: 'ai', text: this.defaultWelcomeText }];
                 this.saveMessageLog();
@@ -188,7 +168,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 localStorage.setItem('ai_chat_session_id', this.sessionId);
             }
 
-            this.bindApiKeyModal();
             this.ensureResetButton();
             this.bindResetButton();
             this.ensureVoiceButton();
@@ -365,7 +344,6 @@ document.addEventListener('DOMContentLoaded', function() {
             this.touchActive();
             this.input.focus();
             this.scrollToBottom();
-            this.promptApiKeyIfNeeded();
         },
 
         closeChatWindow(persist = true) {
@@ -555,78 +533,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 : '<i class="fas fa-microphone"></i>';
         },
 
-        getSavedClientApiKey() {
-            return (localStorage.getItem(this.apiKeyStorageKey) || '').trim();
-        },
-
-        bindApiKeyModal() {
-            if (!this.apiKeyModal) return;
-
-            const closeWithMock = () => {
-                localStorage.setItem(this.apiPromptDismissKey, '1');
-                this.closeApiKeyModal();
-            };
-
-            if (this.closeApiModalBtn) {
-                this.closeApiModalBtn.addEventListener('click', closeWithMock);
-            }
-            if (this.cancelApiKeyBtn) {
-                this.cancelApiKeyBtn.addEventListener('click', closeWithMock);
-            }
-            if (this.saveApiKeyBtn) {
-                this.saveApiKeyBtn.addEventListener('click', () => {
-                    const key = (this.apiKeyInput?.value || '').trim();
-                    if (!key) {
-                        if (this.apiKeyInput) this.apiKeyInput.focus();
-                        return;
-                    }
-                    localStorage.setItem(this.apiKeyStorageKey, key);
-                    localStorage.removeItem(this.apiPromptDismissKey);
-                    this.closeApiKeyModal();
-                    this.addMessage('API Key 已保存，正在连接 Kimi AI...', 'ai');
-                });
-            }
-
-            this.apiKeyModal.addEventListener('click', (e) => {
-                if (e.target === this.apiKeyModal) {
-                    closeWithMock();
-                }
-            });
-        },
-
-        openApiKeyModal() {
-            if (!this.apiKeyModal) return;
-            this.apiKeyModal.classList.add('active');
-            if (this.apiKeyInput) {
-                this.apiKeyInput.value = this.getSavedClientApiKey();
-                setTimeout(() => this.apiKeyInput.focus(), 50);
-            }
-        },
-
-        closeApiKeyModal() {
-            if (!this.apiKeyModal) return;
-            this.apiKeyModal.classList.remove('active');
-        },
-
-        promptApiKeyIfNeeded(force = false) {
-            // 企业部署模式：优先使用服务端环境变量，不再强制用户输入 API Key。
-            return;
-        },
-
         async sendMessage(text) {
             try {
                 this.touchActive();
-                const savedClientKey = this.getSavedClientApiKey();
-                const headers = {
-                    'Content-Type': 'application/json'
-                };
-                if (savedClientKey) {
-                    headers['X-API-Key'] = savedClientKey;
-                }
-
                 const response = await fetch('/api/chat', {
                     method: 'POST',
-                    headers,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
                     body: JSON.stringify({
                         message: text,
                         history: this.history,
@@ -639,23 +553,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 if (!response.ok) {
                     const errMsg = data.error || '服务暂时不可用';
-                    const detail = data.detail ? `（${data.detail}）` : '';
-                    this.addMessage(`连接失败：${errMsg}${detail}`, 'ai');
+                    // const detail = data.detail ? `（${data.detail}）` : '';
+                    // this.addMessage(`连接失败：${errMsg}${detail}`, 'ai');
+                    this.addMessage('系统升级中，请稍后再试。', 'ai');
+                    
                     const diagnoseText = `${errMsg} ${data.detail || ''}`.toLowerCase();
                     const isEngineBusy = diagnoseText.includes('engine_overloaded') || diagnoseText.includes('overloaded') || diagnoseText.includes('繁忙');
-                    const isServerConfigIssue = diagnoseText.includes('moonshot_api_key') || diagnoseText.includes('api key') || diagnoseText.includes('unauthorized') || diagnoseText.includes('invalid');
-                    if (
-                        isServerConfigIssue
-                    ) {
-                        this.promptApiKeyIfNeeded(true);
-                    }
-                    if (isEngineBusy || isServerConfigIssue || response.status >= 500) {
-                        return;
-                    }
-                    const isMockMode = !savedClientKey && localStorage.getItem(this.apiPromptDismissKey) === '1';
-                    if (isMockMode) {
-                        this.mockAIResponse(text);
-                    }
+                    if (isEngineBusy || response.status >= 500) return;
                     return;
                 }
 
@@ -664,12 +568,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     localStorage.setItem('ai_chat_session_id', this.sessionId);
                 }
 
-                let aiReply = '';
-                if (data.reply) {
-                    aiReply = data.reply;
-                } else if (data.choices && data.choices[0] && data.choices[0].message) {
-                    aiReply = data.choices[0].message.content || '';
-                }
+                const aiReply = typeof data.reply === 'string' ? data.reply : '';
 
                 if (aiReply) {
                     this.addMessage(aiReply, 'ai');
@@ -685,16 +584,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                     this.maybeAcknowledgeLeadCapture(mergedLead, text);
                 } else {
-                    this.mockAIResponse(text);
+                    this.addMessage('暂未获取到有效回复，请稍后重试。', 'ai');
                 }
             } catch (error) {
                 console.error('Network Error:', error);
                 this.removeTyping();
                 this.addMessage('网络连接异常，请检查您的网络设置。', 'ai');
-                const isMockMode = !this.getSavedClientApiKey() && localStorage.getItem(this.apiPromptDismissKey) === '1';
-                if (isMockMode) {
-                    this.mockAIResponse(text);
-                }
             }
         },
 
@@ -735,21 +630,6 @@ document.addEventListener('DOMContentLoaded', function() {
             this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
         },
 
-        mockAIResponse(userText) {
-            let reply = '抱歉，我暂时无法回答这个问题。您可以拨打我们的热线：+86 13676797588';
-
-            if (userText.includes('认证') || userText.includes('体系')) {
-                reply = '我们可协助 ISO9001/14001/45001、ISO22000、IATF16949 等认证。您告诉我行业和目标，我先给您办理顺序。';
-            } else if (userText.includes('你好') || userText.includes('在吗')) {
-                reply = '您好！我是信义智能助手，很高兴为您服务。您可以直接说行业和需求，我来帮您先排优先级。';
-            } else if (userText.includes('价格') || userText.includes('多少钱')) {
-                reply = '费用与行业、现状和目标节点相关。建议您留下电话，我们可先做初评，再给您明确报价范围。';
-            } else if (userText.includes('怎么弄') || userText.includes('怎么办')) {
-                reply = '可以，我先按您的业务场景给您分“必办项”和“建议项”。您补充下产品类型或目标市场，我马上为您细化。';
-            }
-
-            this.addMessage(reply, 'ai');
-        }
     };
     
     aiWidget.ask = function ask(questionText, options = {}) {
@@ -825,7 +705,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // 支持跨页面跳转：?ask=xxx 打开机器人并带入问题（有 Key 则自动发送）
+    // 支持跨页面跳转：?ask=xxx 打开机器人并带入问题后自动发送
     try {
         const params = new URLSearchParams(window.location.search);
         const ask = (params.get('ask') || '').trim();

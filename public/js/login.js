@@ -158,4 +158,17 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('login-email').value = savedEmail;
         document.getElementById('remember').checked = true;
     }
+
+    // 第三方/快捷登录入口提示
+    document.querySelectorAll('.social-btn').forEach((btn) => {
+        btn.addEventListener('click', function() {
+            if (this.classList.contains('wechat')) {
+                showMessage(loginMessage, '微信登录功能开发中，请先使用邮箱密码登录。', 'info');
+                return;
+            }
+            if (this.classList.contains('phone')) {
+                showMessage(loginMessage, '手机号快捷登录功能开发中，请先使用邮箱密码登录。', 'info');
+            }
+        });
+    });
 });

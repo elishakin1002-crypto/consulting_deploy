@@ -190,17 +190,22 @@
 
 .achievement-stats {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 30px;
 }
 
 .stat {
     background-color: white;
-    padding: 40px;
+    padding: 30px 15px; /* 减少水平内边距，给文字更多空间 */
     border-radius: 10px;
     box-shadow: var(--shadow);
     text-align: center;
     transition: var(--transition);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 180px; /* 设置统一高度 */
 }
 
 .stat:hover {
@@ -209,16 +214,20 @@
 }
 
 .stat-number {
-    font-size: 3rem;
+    font-size: 2.8rem; /* 略微缩小字号，防止溢出 */
     font-weight: 700;
     color: var(--secondary-color);
-    margin-bottom: 10px;
+    margin-bottom: 8px;
+    line-height: 1.2;
 }
 
 .stat-desc {
-    font-size: 1.2rem;
+    font-size: 1.1rem; /* 略微缩小字号，尽量保持一行或两行对称 */
     color: var(--primary-color);
     font-weight: 600;
+    line-height: 1.4;
+    max-width: 100%;
+    word-break: keep-all; /* 尽量避免单字断行 */
 }
 
 /* 客户部分 */

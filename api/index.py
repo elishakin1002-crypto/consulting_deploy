@@ -191,7 +191,7 @@ class handler(BaseHTTPRequestHandler):
         self.send_response(status_code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-API-Key, Authorization")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
@@ -201,7 +201,7 @@ class handler(BaseHTTPRequestHandler):
         self._send_json(204, {"ok": True})
 
     def do_GET(self):
-        self._send_json(200, {"ok": True, "service": "xinyi-chat-api", "model": MOONSHOT_MODEL})
+        self._send_json(200, {"ok": True, "service": "xinyi-chat-api", "status": "online"})
 
     def do_POST(self):
         if MODULE_LOAD_ERROR:
@@ -227,17 +227,8 @@ class handler(BaseHTTPRequestHandler):
                 self._send_json(400, {"error": "JSON 格式错误"})
                 return
 
-            client_api_key = _normalize_api_key(self.headers.get("X-API-Key", ""))
-            auth_header = (self.headers.get("Authorization", "") or "").strip()
-            if auth_header.lower().startswith("bearer "):
-                bearer_key = _normalize_api_key(auth_header.split(" ", 1)[1].strip())
-                if bearer_key:
-                    client_api_key = bearer_key
-
-            body_key = _normalize_api_key(str(data.get("api_key") or data.get("apiKey") or data.get("key") or ""))
-            current_api_key = API_KEY or client_api_key or body_key
-            if not current_api_key:
-                self._send_json(500, {"error": "服务端未配置 MOONSHOT_API_KEY"})
+            if not API_KEY:
+                self._send_json(500, {"error": "服务端未配置 AI 服务密钥"})
                 return
 
             user_message = (data.get("message", "") or "").strip()
@@ -293,7 +284,7 @@ class handler(BaseHTTPRequestHandler):
                     data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
                     headers={
                         "Content-Type": "application/json",
-                        "Authorization": f"Bearer {current_api_key}",
+                        "Authorization": f"Bearer {API_KEY}",
                     },
                     method="POST",
                 )
@@ -385,8 +376,6 @@ class handler(BaseHTTPRequestHandler):
                 200,
                 {
                     "reply": reply,
-                    "choices": provider_data.get("choices", []) if isinstance(provider_data, dict) else [],
-                    "model": provider_data.get("model", MOONSHOT_MODEL) if isinstance(provider_data, dict) else MOONSHOT_MODEL,
                     "session_id": session_id,
                     "sales": {
                         "intent": pre_analysis.get("intent"),

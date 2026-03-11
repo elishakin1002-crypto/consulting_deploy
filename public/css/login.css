@@ -178,6 +178,13 @@
     display: block;
 }
 
+.login-message.info {
+    background-color: #e7f2ff;
+    color: #0b4f8a;
+    border: 1px solid #c9e2ff;
+    display: block;
+}
+
 .social-login {
     margin-top: 30px;
     text-align: center;
@@ -237,8 +244,8 @@
     color: white;
 }
 
-.social-btn.weibo {
-    background-color: #E6162D;
+.social-btn.phone {
+    background-color: #1f7ae0;
     color: white;
 }
 
